@@ -399,7 +399,7 @@ def train_worker(gpu_id, config_queue, result_queue, worker_id):
         # TRAIN TOKENIZER
         tokenizer = train_tokenizer(task)
         
-        train_samples = [task.generate_sample(mode=gen_mode, return_data=True) for _ in range(TRAIN_SIZE_PER_DEPTH * n)]
+        train_samples = [task.generate_sample(mode=gen_mode, return_data=True) for _ in range(TRAIN_SIZE_PER_DEPTH * int(n**.7))]
         test_samples = [task.generate_sample(mode=gen_mode, return_data=True) for _ in range(TEST_SIZE)]
         
         os.makedirs("data_logs", exist_ok=True)

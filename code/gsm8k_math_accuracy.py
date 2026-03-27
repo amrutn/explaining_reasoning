@@ -43,6 +43,7 @@ USE_COMPILE = True
 
 # Dataset Configurations
 # Mapped to specific short names for file generation as requested: "gsm8k", "math"
+"""
 DATASETS = {
     "GSM8K": {
         "hf_path": ("gsm8k", "main"),
@@ -72,12 +73,11 @@ DATASETS = {
         "prompt_set": "MATH"
     }
 }
-"""
 
 # ==========================================
 # Prompts
 # ==========================================
-"""
+
 PROMPTS_MATH = {
     "Direct" : ("You are a helpful assistant. Solve the math problem. You should not show any work at all. Output the final answer in a box."),
     "L01" : ("You are a helpful assistant. Solve the math problem. Show your work. Only show important steps. Output the final answer in a box."),
@@ -86,7 +86,7 @@ PROMPTS_MATH = {
     "L04" : ("You are a helpful assistant. Solve the math problem. Show your work step by step. Explain each step. Explicitly check each step to make sure it is correct. Output the final answer in a box."),
     "L05" : ("You are a helpful assistant. Solve the math problem. Show your work step by step. Explain each step. Explicitly double-check each step to make sure it is correct. Output the final answer in a box.")
 }
-"""
+
 PROMPTS_GSM = {
     "Direct" : ("You are a helpful assistant. Solve the math problem. You should not show any work at all. Prepend #### to your final answer."),
     "L01" : ("You are a helpful assistant. Solve the math problem. Show your work. Only show important steps. Prepend #### to your final answer."),
@@ -125,7 +125,7 @@ FEW_SHOT_GSM = {
              \n Weng earns $12 an hour for babysitting. Yesterday, she just did 50 minutes of babysitting. How much did she earn?\
               \n I should calculate Weng's earning rate per minute. Weng earns 12/60 = 1/5 dollars per minute. Checking, 12/60=1/5 because 60/12=5. Checking again, 12/60=0.2 which is equal to 1/5. To calculate the money earned, I must multiply the earning rate with the time spent working. In 50 minutes, she earns 1/5 dollars per minute*50 minutes=10 dollars. Checking, I must multiply time working with the earning rate, 50*1/5=10 is correct. Checking again, 50*1/5 is 10. #### 10 \n")
 }
-"""
+
 FEW_SHOT_MATH = {
     "Direct" : (r"Let \[f(x) = \left\{ \begin{array}{cl} ax+3, &\text{ if }x>2, \\ x-5 &\text{ if } -2 \le x \le 2, \\ 2x-b &\text{ if } x <-2. \end{array} \right.\]Find $a+b$ if the piecewise function is continuous (which means that its graph can be drawn without lifting your pencil from the paper). \
         \n $\boxed{0}$\
@@ -157,7 +157,7 @@ FEW_SHOT_MATH = {
         \n What is the value of $9^3 + 3(9^2) + 3(9) + 1$?\
         \n This expression is a cubic polynomial with coefficients $(1,3,3,1)$ in decreasing order of degree. Identifying the polynomial nature in the expression will help us solve it. Given that the expression is a polynomial, we can try to factorize it. The polynomial $(x+1)^3=x^3+3x^2+3x+1$ has the same coefficients as the expression. Checking, $(x+1)^3=(x+1)(x+1)(x+1)=(x+1)(x^2+2x+1)=x^3+2x^2+x+x^2+2x+1=x^3+3x^2+3x+1$ which yields the correct coefficients. Checking again, $(x+1)^3$ can be expanded to be (x+1)(x+1)(x+1)=(x^2+2x+1)(x+1)=x^3+2x^2+x+x^2+2x+1=x^3+3x^2+3x+1$, matching the coefficients in the expression. This means the expression is equal to $(x+1)^3$ for $x=9$ which is $(9+1)^3. By writing the expression in this factorized form, we can evaluate the entire expression by computing the simplified sum $9+1=10$ within the parentheses. Thus, its value is $10^3$. \boxed{1000}$")
 }
-"""
+
 def get_prompts_for_dataset(dataset_name):
     if DATASETS[dataset_name]["prompt_set"] == "GSM":
         return PROMPTS_GSM

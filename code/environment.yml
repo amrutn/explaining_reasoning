@@ -287,4 +287,8 @@ dependencies:
       - torchaudio==2.9.1+cu126
       - torchvision==0.24.1+cu126
       - triton==3.5.1
+      - anthropic>=0.40.0
+      - openai>=1.50.0
+      - google-genai>=1.0.0
+      - tenacity>=8.2.0
 prefix: /home/amrutn/anaconda3/envs/entropy_decoding

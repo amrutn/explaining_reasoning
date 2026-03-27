@@ -18,14 +18,6 @@ except ImportError:
 # ==========================================
 
 MODELS = {
-    "claude-sonnet": {
-        "provider": "anthropic",
-        "model_id": "claude-sonnet-4-20250514",
-    },
-    "gpt-4o": {
-        "provider": "openai",
-        "model_id": "gpt-4o",
-    },
     "gemini-flash": {
         "provider": "google",
         "model_id": "gemini-2.5-flash",
@@ -37,8 +29,6 @@ MODELS = {
 }
 
 # API Keys
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
@@ -212,94 +202,6 @@ def save_atomic(data, filename):
 # Provider Call Functions
 # ==========================================
 
-async def call_anthropic(model_config, system_prompt, user_message, max_tokens):
-    import anthropic
-
-    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-
-    kwargs = {
-        "model": model_config["model_id"],
-        "messages": [{"role": "user", "content": user_message}],
-        "system": system_prompt,
-        "temperature": 1.0,
-    }
-
-    if model_config["reasoning"]:
-        thinking_budget = model_config.get("thinking_budget", 10000)
-        kwargs["max_tokens"] = thinking_budget + max_tokens
-        kwargs["thinking"] = {
-            "type": "enabled",
-            "budget_tokens": thinking_budget,
-        }
-    else:
-        kwargs["max_tokens"] = max_tokens
-
-    response = await client.messages.create(**kwargs)
-
-    response_text = ""
-    thinking_tokens = 0
-    for block in response.content:
-        if block.type == "thinking":
-            thinking_tokens = getattr(response.usage, "thinking_tokens", 0)
-        elif block.type == "text":
-            response_text = block.text
-
-    # If thinking_tokens not in usage, estimate from output - visible tokens
-    if model_config["reasoning"] and thinking_tokens == 0:
-        thinking_tokens = max(0, response.usage.output_tokens - len(response_text.split()))
-
-    return {
-        "response_text": response_text,
-        "input_tokens": response.usage.input_tokens,
-        "output_tokens": response.usage.output_tokens,
-        "thinking_tokens": thinking_tokens,
-    }
-
-
-async def call_openai(model_config, system_prompt, user_message, max_tokens):
-    import openai
-
-    client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
-
-    if model_config["reasoning"]:
-        # Reasoning models: use developer role, no temperature, max_completion_tokens
-        messages = [
-            {"role": "developer", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ]
-        response = await client.chat.completions.create(
-            model=model_config["model_id"],
-            messages=messages,
-            max_completion_tokens=max_tokens,
-        )
-        thinking_tokens = 0
-        if response.usage.completion_tokens_details:
-            thinking_tokens = getattr(
-                response.usage.completion_tokens_details, "reasoning_tokens", 0
-            ) or 0
-    else:
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ]
-        response = await client.chat.completions.create(
-            model=model_config["model_id"],
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=1.0,
-        )
-        thinking_tokens = 0
-
-    response_text = response.choices[0].message.content or ""
-
-    return {
-        "response_text": response_text,
-        "input_tokens": response.usage.prompt_tokens,
-        "output_tokens": response.usage.completion_tokens,
-        "thinking_tokens": thinking_tokens,
-    }
-
-
 async def call_google(model_config, system_prompt, user_message, max_tokens):
     from google import genai
     from google.genai import types
@@ -312,7 +214,6 @@ async def call_google(model_config, system_prompt, user_message, max_tokens):
         max_output_tokens=max_tokens,
     )
 
-    # Run synchronous call in executor to avoid blocking
     loop = asyncio.get_event_loop()
     response = await loop.run_in_executor(
         None,
@@ -327,15 +228,11 @@ async def call_google(model_config, system_prompt, user_message, max_tokens):
 
     input_tokens = response.usage_metadata.prompt_token_count or 0
     output_tokens = response.usage_metadata.candidates_token_count or 0
-    thinking_tokens = getattr(
-        response.usage_metadata, "thoughts_token_count", 0
-    ) or 0
 
     return {
         "response_text": response_text,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
-        "thinking_tokens": thinking_tokens,
     }
 
 
@@ -352,29 +249,19 @@ async def call_deepseek(model_config, system_prompt, user_message, max_tokens):
         {"role": "user", "content": user_message},
     ]
 
-    kwargs = {
-        "model": model_config["model_id"],
-        "messages": messages,
-        "max_tokens": max_tokens,
-    }
-
-    if not model_config["reasoning"]:
-        kwargs["temperature"] = 1.0
-
-    response = await client.chat.completions.create(**kwargs)
+    response = await client.chat.completions.create(
+        model=model_config["model_id"],
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=1.0,
+    )
 
     response_text = response.choices[0].message.content or ""
-    thinking_tokens = 0
-    if model_config["reasoning"] and response.usage.completion_tokens_details:
-        thinking_tokens = getattr(
-            response.usage.completion_tokens_details, "reasoning_tokens", 0
-        ) or 0
 
     return {
         "response_text": response_text,
         "input_tokens": response.usage.prompt_tokens,
         "output_tokens": response.usage.completion_tokens,
-        "thinking_tokens": thinking_tokens,
     }
 
 
@@ -383,8 +270,6 @@ async def call_deepseek(model_config, system_prompt, user_message, max_tokens):
 # ==========================================
 
 PROVIDER_FUNCTIONS = {
-    "anthropic": call_anthropic,
-    "openai": call_openai,
     "google": call_google,
     "deepseek": call_deepseek,
 }
@@ -393,11 +278,6 @@ PROVIDER_FUNCTIONS = {
 def _get_retry_exceptions():
     """Collect retryable exception types from installed providers."""
     exceptions = [ConnectionError, TimeoutError]
-    try:
-        import anthropic
-        exceptions.extend([anthropic.RateLimitError, anthropic.APIConnectionError, anthropic.InternalServerError])
-    except ImportError:
-        pass
     try:
         import openai
         exceptions.extend([openai.RateLimitError, openai.APIConnectionError, openai.InternalServerError])
@@ -428,14 +308,13 @@ async def call_model(model_key, system_prompt, user_message, max_tokens):
 # Core Processing
 # ==========================================
 
-async def process_single_call(model_key, system_prompt, question, max_tokens, rep, q_idx, gt_clean):
+async def process_single_call(model_key, system_prompt, user_message, max_tokens, rep, q_idx, gt_clean):
     """Process a single (question, prompt_level, replicate) combination."""
     try:
-        result = await call_model(model_key, system_prompt, question, max_tokens)
+        result = await call_model(model_key, system_prompt, user_message, max_tokens)
 
         response_text = result["response_text"]
         output_tokens = result["output_tokens"]
-        thinking_tokens = result["thinking_tokens"]
 
         truncated = output_tokens >= max_tokens
 
@@ -449,7 +328,6 @@ async def process_single_call(model_key, system_prompt, question, max_tokens, re
             "replicate": rep,
             "response_text": response_text,
             "token_count": int(output_tokens),
-            "thinking_tokens": int(thinking_tokens),
             "truncated": truncated,
             "is_correct": bool(is_correct),
             "q_idx": q_idx,
@@ -460,7 +338,6 @@ async def process_single_call(model_key, system_prompt, question, max_tokens, re
             "replicate": rep,
             "response_text": "",
             "token_count": 0,
-            "thinking_tokens": 0,
             "truncated": False,
             "is_correct": False,
             "q_idx": q_idx,
@@ -475,6 +352,7 @@ async def process_dataset(dataset_name, model_key, num_samples=None):
     print(f"Output file: {output_file}")
 
     current_prompts = get_prompts_for_dataset(dataset_name)
+    few_shot_examples = get_few_shot_for_dataset(dataset_name)
     required_keys = set(current_prompts.keys())
 
     # Load existing results for resume support
@@ -551,11 +429,13 @@ async def process_dataset(dataset_name, model_key, num_samples=None):
         for condition_name in sorted(current_prompts.keys()):
             system_prompt = current_prompts[condition_name]
             max_tokens = get_max_tokens(condition_name)
+            few_shot_prefix = few_shot_examples.get(condition_name, "")
 
             for q_idx in batch_indices:
                 q_idx_int = int(q_idx)
 
                 question = dataset[q_idx][config["col_q"]]
+                user_message = few_shot_prefix + question
                 gt_clean = batch_entries[q_idx_int]["ground_truth_clean"]
 
                 for rep in REPS:
@@ -567,7 +447,7 @@ async def process_dataset(dataset_name, model_key, num_samples=None):
                             continue
 
                     task = process_single_call(
-                        model_key, system_prompt, question, max_tokens, rep, q_idx_int, gt_clean
+                        model_key, system_prompt, user_message, max_tokens, rep, q_idx_int, gt_clean
                     )
                     tasks.append(task)
                     task_meta.append((q_idx_int, condition_name))
@@ -731,15 +611,12 @@ def plot_api_performance(dataset_name):
         x_val, y_val, y_err = zip(*plot_points)
 
         color = provider_colors.get(model_config["provider"], "gray")
-        linestyle = "--" if model_config["reasoning"] else "-"
-        marker = "s" if model_config["reasoning"] else "o"
 
         ax.errorbar(
             x_val,
             y_val,
             yerr=y_err,
-            fmt=f"{linestyle}",
-            marker=marker,
+            fmt="-o",
             color=color,
             linewidth=2,
             label=model_key,
@@ -769,27 +646,14 @@ def plot_api_performance(dataset_name):
 def estimate_costs(datasets_to_run, models_to_run, num_samples):
     """Print rough cost estimates before running."""
     # Approximate per-1M-token costs (input, output)
-    # For reasoning models, output cost applies to thinking + visible tokens
     cost_per_1m = {
-        "claude-sonnet": (3.0, 15.0),
-        "claude-sonnet-thinking": (3.0, 15.0),
-        "gpt-4o": (2.5, 10.0),
-        "o4-mini": (1.1, 4.4),
         "gemini-flash": (0.15, 0.6),
-        "gemini-pro": (1.25, 10.0),
         "deepseek-v3": (0.27, 1.1),
-        "deepseek-r1": (0.55, 2.19),
     }
-    # Average output tokens (standard vs reasoning models)
+    # Average output tokens per call
     avg_output = {
-        "claude-sonnet": 200,
-        "claude-sonnet-thinking": 2500,
-        "gpt-4o": 200,
-        "o4-mini": 1500,
         "gemini-flash": 200,
-        "gemini-pro": 1200,
         "deepseek-v3": 200,
-        "deepseek-r1": 1500,
     }
 
     print("\n=== Cost Estimate ===")
@@ -825,8 +689,6 @@ async def main(args):
     os.makedirs("summary", exist_ok=True)
 
     # Initialize per-provider semaphores
-    PROVIDER_SEMAPHORES["anthropic"] = asyncio.Semaphore(5)
-    PROVIDER_SEMAPHORES["openai"] = asyncio.Semaphore(10)
     PROVIDER_SEMAPHORES["google"] = asyncio.Semaphore(5)
     PROVIDER_SEMAPHORES["deepseek"] = asyncio.Semaphore(3)
 

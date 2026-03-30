@@ -16,12 +16,19 @@ except ImportError:
 # ==========================================
 # Configuration
 # ==========================================
-
+"""
 MODELS = {
     "gemini-flash": {
         "provider": "google",
         "model_id": "gemini-2.5-flash",
     },
+    "deepseek-v3": {
+        "provider": "deepseek",
+        "model_id": "deepseek-chat",
+    },
+}
+"""
+MODELS = {
     "deepseek-v3": {
         "provider": "deepseek",
         "model_id": "deepseek-chat",
@@ -195,7 +202,7 @@ def save_atomic(data, filename):
             json.dump(data, f, indent=2)
         os.replace(temp_filename, filename)
     except Exception as e:
-        print(f"Failed to save: {e}")
+        print(f"Failed to save: {e}", flush=True)
 
 
 # ==========================================
@@ -334,7 +341,7 @@ async def process_single_call(model_key, system_prompt, user_message, max_tokens
             "q_idx": q_idx,
         }
     except Exception as e:
-        print(f"  Error on q={q_idx}, rep={rep}: {e}")
+        print(f"  Error on q={q_idx}, rep={rep}: {e}", flush=True)
         return {
             "replicate": rep,
             "response_text": "",
@@ -349,8 +356,8 @@ async def process_dataset(dataset_name, model_key, num_samples=None):
     config = DATASETS[dataset_name]
     output_file = get_output_path(dataset_name, model_key)
 
-    print(f"\n=== Processing Dataset: {dataset_name} | Model: {model_key} ===")
-    print(f"Output file: {output_file}")
+    print(f"\n=== Processing Dataset: {dataset_name} | Model: {model_key} ===", flush=True)
+    print(f"Output file: {output_file}", flush=True)
 
     current_prompts = get_prompts_for_dataset(dataset_name)
     few_shot_examples = get_few_shot_for_dataset(dataset_name)
@@ -367,7 +374,7 @@ async def process_dataset(dataset_name, model_key, num_samples=None):
             with open(output_file, "r") as f:
                 existing_results = json.load(f)
 
-            print(f"Loaded {len(existing_results)} existing entries. Checking for completeness...")
+            print(f"Loaded {len(existing_results)} existing entries. Checking for completeness...", flush=True)
 
             for entry in existing_results:
                 missing = set()
@@ -398,10 +405,10 @@ async def process_dataset(dataset_name, model_key, num_samples=None):
     indices_to_process = [i for i in all_indices if i not in fully_complete_ids]
 
     if not indices_to_process:
-        print(f"All samples fully processed for {dataset_name} ({model_key}).")
+        print(f"All samples fully processed for {dataset_name} ({model_key}).", flush=True)
         return
 
-    print(f"Processing {len(indices_to_process)} samples.")
+    print(f"Processing {len(indices_to_process)} samples.", flush=True)
 
     # Process in batches
     batch_size = 20
@@ -457,7 +464,7 @@ async def process_dataset(dataset_name, model_key, num_samples=None):
             continue
 
         # Run all tasks for this batch concurrently
-        print(f"  Batch {batch_start // batch_size + 1}: {len(tasks)} API calls for {len(batch_indices)} questions...")
+        print(f"  Batch {batch_start // batch_size + 1}: {len(tasks)} API calls for {len(batch_indices)} questions...", flush=True)
         results = await asyncio.gather(*tasks)
 
         # Distribute results into batch_entries
@@ -498,7 +505,7 @@ async def process_dataset(dataset_name, model_key, num_samples=None):
 
         existing_results.sort(key=lambda x: x["id"])
         save_atomic(existing_results, output_file)
-        print(f"  Saved {len(existing_results)} entries.")
+        print(f"  Saved {len(existing_results)} entries.", flush=True)
 
 
 # ==========================================
@@ -637,7 +644,7 @@ def plot_api_performance(dataset_name):
     short_name = DATASETS[dataset_name]["file_short_name"]
     plt.savefig(f"{short_name}_api_comparison_error_vs_length.pdf", dpi=300, bbox_inches="tight")
     plt.close()
-    print(f"Saved plot: {short_name}_api_comparison_error_vs_length.pdf")
+    print(f"Saved plot: {short_name}_api_comparison_error_vs_length.pdf", flush=True)
 
 
 # ==========================================
@@ -657,8 +664,8 @@ def estimate_costs(datasets_to_run, models_to_run, num_samples):
         "deepseek-v3": 200,
     }
 
-    print("\n=== Cost Estimate ===")
-    print("(Based on approximate average token counts per call)\n")
+    print("\n=== Cost Estimate ===", flush=True)
+    print("(Based on approximate average token counts per call)\n", flush=True)
     total_cost = 0.0
     total_calls = 0
     for ds_name in datasets_to_run:
@@ -675,9 +682,9 @@ def estimate_costs(datasets_to_run, models_to_run, num_samples):
             model_cost = in_cost + out_cost
             total_cost += model_cost
             total_calls += n_calls
-            print(f"  {ds_name:>8} x {model_key:<25} {n_calls:>7} calls  ~${model_cost:>8.2f}")
+            print(f"  {ds_name:>8} x {model_key:<25} {n_calls:>7} calls  ~${model_cost:>8.2f}", flush=True)
 
-    print(f"\n  Total: {total_calls} API calls, estimated ~${total_cost:.2f}")
+    print(f"\n  Total: {total_calls} API calls, estimated ~${total_cost:.2f}", flush=True)
     print()
 
 
@@ -699,7 +706,7 @@ async def main(args):
         models_to_run = [m.strip() for m in args.models.split(",")]
         for m in models_to_run:
             if m not in MODELS:
-                print(f"Unknown model: {m}. Available: {list(MODELS.keys())}")
+                print(f"Unknown model: {m}. Available: {list(MODELS.keys())}", flush=True)
                 return
 
     datasets_to_run = list(DATASETS.keys())
@@ -707,7 +714,7 @@ async def main(args):
         datasets_to_run = [d.strip() for d in args.datasets.split(",")]
         for d in datasets_to_run:
             if d not in DATASETS:
-                print(f"Unknown dataset: {d}. Available: {list(DATASETS.keys())}")
+                print(f"Unknown dataset: {d}. Available: {list(DATASETS.keys())}", flush=True)
                 return
 
     if args.dry_run:
@@ -719,11 +726,11 @@ async def main(args):
             for model_key in models_to_run:
                 await process_dataset(ds_name, model_key, num_samples=args.num_samples)
 
-    print("\n=== Generating Plots ===")
+    print("\n=== Generating Plots ===", flush=True)
     for ds_name in datasets_to_run:
         plot_api_performance(ds_name)
 
-    print("\n=== Experiment Complete ===")
+    print("\n=== Experiment Complete ===", flush=True)
 
 
 if __name__ == "__main__":

@@ -52,7 +52,7 @@ DATASETS = {
     },
 }
 
-REPS = [0, 1, 2, 3, 4]
+REPS = [0]
 
 # Per-provider concurrency limits
 PROVIDER_SEMAPHORES = {}
@@ -319,8 +319,9 @@ async def process_single_call(model_key, system_prompt, user_message, max_tokens
         truncated = output_tokens >= max_tokens
 
         try:
+            parsed_gold = parse(gt_clean)
             parsed_answer = parse(response_text)
-            is_correct = verify(gt_clean, parsed_answer)
+            is_correct = verify(parsed_gold, parsed_answer)
         except Exception:
             is_correct = False
 
